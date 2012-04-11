@@ -1,4 +1,5 @@
-//Go beanstalk client library
+//Go beanstalkd client library
+//Copyright(2012) Iwan Budi Kusnanto. See LICENSE for detail
 package gobeanstalk
 
 import (
@@ -49,6 +50,7 @@ type Conn struct {
 	reader *bufio.Reader
 }
 
+//create new connection
 func NewConn(conn net.Conn, addr string) (*Conn, error) {
 	c := new(Conn)
 	c.conn = conn
@@ -56,6 +58,28 @@ func NewConn(conn net.Conn, addr string) (*Conn, error) {
 	c.reader = bufio.NewReader(conn)
 
 	return c, nil
+}
+
+//Watching tube
+func (c *Conn) Watch(tubename string) (int, error) {
+	err := c.sendCmd("watch %s\r\n", tubename)
+	if err != nil {
+		return -1, err
+	}
+
+	//wait for response
+	resp, err := c.reader.ReadString('\n')
+	if err != nil {
+		log.Println("[watch]waiting response failed:", err.Error())
+		return -1, err
+	}
+
+	var tubeCount int
+	_, err = fmt.Sscanf(resp, "WATCHING %d\r\n", &tubeCount)
+	if err != nil {
+		return -1, err
+	}
+	return tubeCount, nil
 }
 
 //Reserve Job
@@ -102,6 +126,29 @@ func (c *Conn) Reserve() (*Job, error) {
 	}
 
 	return &Job{id, body, c}, nil
+}
+
+//Use tube
+func (c *Conn) Use(tubename string) error {
+	err := c.sendCmd("use %s\r\n", tubename)
+	if err != nil {
+		return err
+	}
+
+	//wait for response
+	resp, err := c.reader.ReadString('\n')
+	if err != nil {
+		log.Println("[use]waiting response failed:", err.Error())
+		return err
+	}
+
+	//match thw response
+	expected := "USING " + tubename + "\r\n"
+	if resp != expected {
+		log.Println("response = ", resp)
+		return errUnknown
+	}
+	return nil
 }
 
 //Put job
@@ -175,6 +222,7 @@ func parseCommonError(str string) error {
 	return errUnknown
 }
 
+//concat two slices of []byte
 func concatSlice(slc1, slc2 []byte) []byte {
 	newSlc := make([]byte, len(slc1)+len(slc2))
 	copy(newSlc, slc1)

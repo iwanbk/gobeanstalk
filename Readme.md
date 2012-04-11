@@ -1,5 +1,5 @@
 #gobeanstalk
-Go Beanstalkd client library
+Go [Beanstalkd](http://kr.github.com/beanstalkd/) client library
 
 ## INSTALL
 	go get github.com/iwanbk/gobeanstalk
@@ -58,12 +58,14 @@ func main() {
 }
 ```
 
-## Implementad command/API
+## Implemented Commands
 
+* use
 * put
+* watch
 * reserve
 * delete
 
 ## Author
 
-* Iwan Budi Kusnanto
+* [Iwan Budi Kusnanto](http://ibk.labhijau.net)
