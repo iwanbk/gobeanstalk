@@ -60,11 +60,16 @@ func main() {
 
 ## Implemented Commands
 
+Producer commands
 * use
 * put
+
+Worker commands
 * watch
 * reserve
 * delete
+* release
+* bury
 
 ## Author
 
