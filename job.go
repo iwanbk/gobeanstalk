@@ -4,12 +4,14 @@ import (
 	"log"
 )
 
+//A beanstalkd job
 type Job struct {
 	Id uint64
 	Body []byte
 	c *Conn
 }
 
+//Create new job
 func NewJob(id uint64, body []byte, c *Conn) *Job {
 	j :=  &Job{id, body, c}
 	return j
