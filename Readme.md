@@ -60,11 +60,13 @@ func main() {
 
 ## Implemented Commands
 
-Producer commands
+Producer commands:
+
 * use
 * put
 
-Worker commands
+Worker commands:
+
 * watch
 * reserve
 * delete
