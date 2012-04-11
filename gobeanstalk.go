@@ -27,22 +27,6 @@ var (
 	errUnknown        = errors.New("Unknown Error")
 )
 
-//Connect to beanstalkd server
-func Dial(addr string) (*Conn, error) {
-	kon, err := net.Dial("tcp", addr)
-	if err != nil {
-		return nil, err
-	}
-
-	c, err := NewConn(kon, addr)
-
-	if err != nil {
-		return nil, err
-	}
-
-	return c, nil
-}
-
 //Connection to beanstalkd
 type Conn struct {
 	conn   net.Conn
@@ -56,6 +40,35 @@ func NewConn(conn net.Conn, addr string) (*Conn, error) {
 	c.conn = conn
 	c.addr = addr
 	c.reader = bufio.NewReader(conn)
+
+	return c, nil
+}
+
+
+//A beanstalkd job
+type Job struct {
+	Id uint64
+	Body []byte
+}
+
+//Create new job
+func NewJob(id uint64, body []byte) *Job {
+	j :=  &Job{id, body}
+	return j
+}
+
+//Connect to beanstalkd server
+func Dial(addr string) (*Conn, error) {
+	kon, err := net.Dial("tcp", addr)
+	if err != nil {
+		return nil, err
+	}
+
+	c, err := NewConn(kon, addr)
+
+	if err != nil {
+		return nil, err
+	}
 
 	return c, nil
 }
@@ -125,7 +138,31 @@ func (c *Conn) Reserve() (*Job, error) {
 		return nil, errors.New(fmt.Sprintf("invalid body len = %d/%d", len(body), bodyLen))
 	}
 
-	return &Job{id, body, c}, nil
+	return &Job{id, body}, nil
+}
+
+//Delete a job
+func (c *Conn) Delete(id uint64) error {
+	err := c.sendCmd("delete %d\r\n", id)
+	if err != nil {
+		log.Println("send delete command failed:", err.Error())
+		return err
+	}
+
+	//read response
+	resp, err := c.reader.ReadString('\n')
+	if err != nil {
+		log.Println("waiting response failed:", err.Error())
+		return err
+	}
+
+	switch resp {
+	case "DELETED\r\n":
+		return nil
+	case "NOT_FOUND\r\n":
+		return errNotFound
+	}
+	return parseCommonError(resp)
 }
 
 //Use tube
@@ -191,6 +228,68 @@ func (c *Conn) Put(data []byte, pri, delay, ttr int) (uint64, error) {
 	return 0, errUnknown
 }
 
+
+/*
+Release a job.
+
+The release command puts a reserved job back into the ready queue (and marks
+its state as "ready") to be run by any client. It is normally used when the job
+fails because of a transitory error.
+	id is the job id to release.
+	pri is a new priority to assign to the job.
+	delay is an integer number of seconds to wait before putting the job in
+		the ready queue. The job will be in the "delayed" state during this time.
+*/
+func (c *Conn) Release(id uint64, pri, delay int) error {
+	err := c.sendCmd("release %d %d %d\r\n", id, pri, delay)
+	if err != nil {
+		return err
+	}
+
+	//wait for response
+	resp, err := c.reader.ReadString('\n')
+	if err != nil {
+		log.Println("[release]waiting response failed:", err.Error())
+		return err
+	}
+
+	//match the response
+	if resp == "RELEASED\r\n" {
+		return nil
+	}
+	return parseCommonError(resp)
+}
+
+/*
+Bury a job.
+
+The bury command puts a job into the "buried" state. Buried jobs are put into a
+FIFO linked list and will not be touched by the server again until a client
+kicks them with the "kick" command.
+	id is the job id to release.
+	pri is a new priority to assign to the job.
+*/
+func (c *Conn) Bury(id uint64, pri int) error {
+	err := c.sendCmd("bury %d %d\r\n", id, pri)
+	if err != nil {
+		return err
+	}
+
+	//wait for response
+	resp, err := c.reader.ReadString('\n')
+	if err != nil {
+		log.Println("[release]waiting response failed:", err.Error())
+		return err
+	}
+
+	//match the response
+	if resp == "BURIED\r\n" {
+		return nil
+	}
+	return parseCommonError(resp)
+
+}
+
 //Send command to server
 func (c *Conn) sendCmd(format string, args ...interface{}) error {
 	cmd := fmt.Sprintf(format, args...)
@@ -210,6 +309,10 @@ func (c *Conn) readBytes() ([]byte, error) {
 //parse for Common Error
 func parseCommonError(str string) error {
 	switch str {
+	case "BURIED\r\n":
+		return errBuried
+	case "NOT_FOUND\r\n":
+		return errNotFound
 	case "OUT_OF_MEMORY\r\n":
 		return errOutOfMemory
 	case "INTERNAL_ERROR\r\n":

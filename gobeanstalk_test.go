@@ -29,32 +29,36 @@ func TestUse(t *testing.T) {
 	}
 }
 
-func TestPut(t *testing.T) {
+func put(t *testing.T, tubename string, jobBody string) {
 	conn := dial(t)
-	err := conn.Use(testtube)
+	err := conn.Use(tubename)
 	if err != nil {
 		t.Fatal("use failed.Err = ", err.Error())
 	}
-	_, err = conn.Put([]byte("testjob"), 0, 0, 0)
+	_, err = conn.Put([]byte(jobBody), 0, 0, 0)
 	if err != nil {
 		t.Fatal("Put failed. Err = ", err.Error())
 	}
 }
 
-func watch(t *testing.T) *Conn {
+func TestPut(t *testing.T) {
+	put(t, testtube, testjob)
+}
+
+func watch(t *testing.T, tubename string) *Conn {
 	conn := dial(t)
-	_, err := conn.Watch(testtube)
+	_, err := conn.Watch(tubename)
 	if err != nil {
 		t.Fatal(err)
 	}
 	return conn
 }
 func TestWatch(t *testing.T) {
-	watch(t)
+	watch(t, testtube)
 }
 
-func reserve(t *testing.T) *Job {
-	conn := watch(t)
+func reserve(t *testing.T, tubename string) (*Conn, *Job) {
+	conn := watch(t, tubename)
 	j, err := conn.Reserve()
 	if err != nil {
 		t.Fatal(err)
@@ -62,15 +66,15 @@ func reserve(t *testing.T) *Job {
 	if string(j.Body) != testjob {
 		t.Fatal("job body check failed")
 	}
-	return j
+	return conn, j
 }
 func TestReserve(t *testing.T) {
-	reserve(t)
+	reserve(t, testtube)
 }
 
 func TestDelete(t *testing.T) {
-	j := reserve(t)
-	err := j.Delete()
+	conn, j := reserve(t, testtube)
+	err := conn.Delete(j.Id)
 	if err != nil {
 		t.Error("delete failed. Err = ", err.Error())
 	}
