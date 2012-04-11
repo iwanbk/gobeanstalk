@@ -90,7 +90,7 @@ func (c *Conn) Watch(tubename string) (int, error) {
 	var tubeCount int
 	_, err = fmt.Sscanf(resp, "WATCHING %d\r\n", &tubeCount)
 	if err != nil {
-		return -1, err
+		return -1, parseCommonError(resp)
 	}
 	return tubeCount, nil
 }
@@ -124,6 +124,8 @@ func (c *Conn) Reserve() (*Job, error) {
 		return nil, errDeadlineSoon
 	case resp == "TIMED_OUT\r\n":
 		return nil, errTimedOut
+	default:
+		return nil, parseCommonError(resp)
 	}
 
 	//read job body
@@ -183,7 +185,7 @@ func (c *Conn) Use(tubename string) error {
 	expected := "USING " + tubename + "\r\n"
 	if resp != expected {
 		log.Println("response = ", resp)
-		return errUnknown
+		return parseCommonError(resp)
 	}
 	return nil
 }
