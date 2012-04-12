@@ -95,6 +95,34 @@ func (c *Conn) Watch(tubename string) (int, error) {
 	return tubeCount, nil
 }
 
+/*
+Ignore tube.
+
+The "ignore" command is for consumers. It removes the named tube from the
+watch list for the current connection
+*/
+func (c *Conn) Ignore(tubename string) (int, error) {
+	//send command
+	err := c.sendCmd("ignore %s\r\n", tubename)
+	if err != nil {
+		return -1, err
+	}
+
+	//read response string
+	resp, err := c.reader.ReadString('\n')
+	if err != nil {
+		return -1, err
+	}
+
+	//parse response
+	var tubeCount int
+	_, err = fmt.Sscanf(resp, "WATCHING %d\r\n", &tubeCount)
+	if err != nil {
+		return -1, parseCommonError(resp)
+	}
+	return tubeCount, nil
+}
+
 //Reserve Job
 func (c *Conn) Reserve() (*Job, error) {
 	//send command
@@ -289,9 +317,38 @@ func (c *Conn) Bury(id uint64, pri int) error {
 		return nil
 	}
 	return parseCommonError(resp)
-
 }
 
+/*
+Touch a job
+
+The "touch" command allows a worker to request more time to work on a job.
+This is useful for jobs that potentially take a long time, but you still want
+the benefits of a TTR pulling a job away from an unresponsive worker. A worker
+may periodically tell the server that it's still alive and processing a job
+(e.g. it may do this on DEADLINE_SOON)
+*/
+func (c *Conn) Touch(id uint64) error {
+	err := c.sendCmd("touch %d\r\n", id)
+	if err != nil {
+		return err
+	}
+
+	//wait for response
+	resp, err := c.reader.ReadString('\n')
+	if err != nil {
+		return err
+	}
+
+	//match the response
+	switch resp {
+	case "TOUCHED\r\n":
+		return nil
+	case "NOT_FOUND\r\n":
+		return errNotFound
+	}
+	return parseCommonError(resp)
+}
 //Send command to server
 func (c *Conn) sendCmd(format string, args ...interface{}) error {
 	cmd := fmt.Sprintf(format, args...)
