@@ -68,8 +68,10 @@ Producer commands:
 Worker commands:
 
 * watch
+* ignore
 * reserve
 * delete
+* touch
 * release
 * bury
 
