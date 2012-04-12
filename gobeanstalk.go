@@ -24,6 +24,11 @@ var (
 	errDeadlineSoon   = errors.New("Deadline Soon")
 	errTimedOut       = errors.New("Timed Out")
 	errNotFound       = errors.New("Not Found")
+)
+
+//gobeanstalk error
+var (
+	errInvalidLen	  = errors.New("Invalid Length")
 	errUnknown        = errors.New("Unknown Error")
 )
 
@@ -118,6 +123,9 @@ func (c *Conn) Ignore(tubename string) (int, error) {
 	var tubeCount int
 	_, err = fmt.Sscanf(resp, "WATCHING %d\r\n", &tubeCount)
 	if err != nil {
+		if resp == "NOT_IGNORED\r\n" {
+			return -1, errors.New("Not Ignored")
+		}
 		return -1, parseCommonError(resp)
 	}
 	return tubeCount, nil
@@ -173,49 +181,27 @@ func (c *Conn) Reserve() (*Job, error) {
 
 //Delete a job
 func (c *Conn) Delete(id uint64) error {
-	err := c.sendCmd("delete %d\r\n", id)
-	if err != nil {
-		log.Println("send delete command failed:", err.Error())
-		return err
-	}
-
-	//read response
-	resp, err := c.reader.ReadString('\n')
-	if err != nil {
-		log.Println("waiting response failed:", err.Error())
-		return err
-	}
-
-	switch resp {
-	case "DELETED\r\n":
-		return nil
-	case "NOT_FOUND\r\n":
-		return errNotFound
-	}
-	return parseCommonError(resp)
+	cmd := fmt.Sprintf("delete %d\r\n", id)
+	expected := "DELETED\r\n"
+	return sendExpectExact(c, cmd, expected)
 }
 
-//Use tube
+/*
+Use tube
+
+The "use" command is for producers. Subsequent put commands will put jobs into
+the tube specified by this command. If no use command has been issued, jobs
+will be put into the tube named "default".
+*/
 func (c *Conn) Use(tubename string) error {
-	err := c.sendCmd("use %s\r\n", tubename)
-	if err != nil {
-		return err
+	//check parameter
+	if len(tubename) > 200 {
+		return errInvalidLen
 	}
 
-	//wait for response
-	resp, err := c.reader.ReadString('\n')
-	if err != nil {
-		log.Println("[use]waiting response failed:", err.Error())
-		return err
-	}
-
-	//match thw response
-	expected := "USING " + tubename + "\r\n"
-	if resp != expected {
-		log.Println("response = ", resp)
-		return parseCommonError(resp)
-	}
-	return nil
+	cmd := fmt.Sprintf("use %s\r\n", tubename)
+	expected := fmt.Sprintf("USING %s\r\n", tubename)
+	return sendExpectExact(c, cmd, expected)
 }
 
 //Put job
@@ -271,23 +257,9 @@ fails because of a transitory error.
 		the ready queue. The job will be in the "delayed" state during this time.
 */
 func (c *Conn) Release(id uint64, pri, delay int) error {
-	err := c.sendCmd("release %d %d %d\r\n", id, pri, delay)
-	if err != nil {
-		return err
-	}
-
-	//wait for response
-	resp, err := c.reader.ReadString('\n')
-	if err != nil {
-		log.Println("[release]waiting response failed:", err.Error())
-		return err
-	}
-
-	//match the response
-	if resp == "RELEASED\r\n" {
-		return nil
-	}
-	return parseCommonError(resp)
+	cmd := fmt.Sprintf("release %d %d %d\r\n", id, pri, delay)
+	expected := "RELEASED\r\n"
+	return sendExpectExact(c, cmd, expected)
 }
 
 /*
@@ -300,23 +272,9 @@ kicks them with the "kick" command.
 	pri is a new priority to assign to the job.
 */
 func (c *Conn) Bury(id uint64, pri int) error {
-	err := c.sendCmd("bury %d %d\r\n", id, pri)
-	if err != nil {
-		return err
-	}
-
-	//wait for response
-	resp, err := c.reader.ReadString('\n')
-	if err != nil {
-		log.Println("[release]waiting response failed:", err.Error())
-		return err
-	}
-
-	//match the response
-	if resp == "BURIED\r\n" {
-		return nil
-	}
-	return parseCommonError(resp)
+	cmd := fmt.Sprintf("bury %d %d\r\n", id, pri)
+	expected := "BURIED\r\n"
+	return sendExpectExact(c, cmd, expected)
 }
 
 /*
@@ -329,7 +287,14 @@ may periodically tell the server that it's still alive and processing a job
 (e.g. it may do this on DEADLINE_SOON)
 */
 func (c *Conn) Touch(id uint64) error {
-	err := c.sendCmd("touch %d\r\n", id)
+	cmd := fmt.Sprintf("touch %d\r\n", id)
+	expected := "TOUCHED\r\n"
+	return sendExpectExact(c, cmd, expected)
+}
+
+//send command and expect some exact response
+func sendExpectExact(c *Conn, cmd, expected string) error {
+	_, err := c.conn.Write([]byte(cmd))
 	if err != nil {
 		return err
 	}
@@ -340,16 +305,13 @@ func (c *Conn) Touch(id uint64) error {
 		return err
 	}
 
-	//match the response
-	switch resp {
-	case "TOUCHED\r\n":
-		return nil
-	case "NOT_FOUND\r\n":
-		return errNotFound
+	if resp != expected {
+		return parseCommonError(resp)
 	}
-	return parseCommonError(resp)
+	return nil
 }
-//Send command to server
+
+//Send formatted command to server
 func (c *Conn) sendCmd(format string, args ...interface{}) error {
 	cmd := fmt.Sprintf(format, args...)
 	_, err := c.conn.Write([]byte(cmd))
