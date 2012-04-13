@@ -37,7 +37,8 @@ var (
 type Conn struct {
 	conn   net.Conn
 	addr   string
-	reader *bufio.Reader
+	bufReader *bufio.Reader
+	bufWriter *bufio.Writer
 }
 
 //create new connection
@@ -45,7 +46,8 @@ func NewConn(conn net.Conn, addr string) (*Conn, error) {
 	c := new(Conn)
 	c.conn = conn
 	c.addr = addr
-	c.reader = bufio.NewReader(conn)
+	c.bufReader = bufio.NewReader(conn)
+	c.bufWriter = bufio.NewWriter(conn)
 
 	return c, nil
 }
@@ -149,7 +151,7 @@ func (c *Conn) Reserve() (*Job, error) {
 
 	//read job body
 	body := make([]byte, bodyLen+2) //+2 is for trailing \r\n
-	n, err := io.ReadFull(c.reader, body)
+	n, err := io.ReadFull(c.bufReader, body)
 	if err != nil {
 		log.Println("failed reading body:", err.Error())
 		return nil, err
@@ -279,17 +281,43 @@ func sendExpectExact(c *Conn, cmd, expected string) error {
 
 //Send command and read response
 func sendGetResp(c *Conn, cmd string) (string, error) {
-	_, err := c.conn.Write([]byte(cmd))
+	//_, err := c.conn.Write([]byte(cmd))
+	_, err := sendFull(c, []byte(cmd))
 	if err != nil {
 		return "", err
 	}
 
 	//wait for response
-	resp, err := c.reader.ReadString('\n')
+	resp, err := c.bufReader.ReadString('\n')
 	if err != nil {
 		return "", err
 	}
 	return resp, nil
+}
+
+func sendFull(c *Conn, data []byte) (int, error) {
+	toWrite := data
+	totWritten := 0
+	var n int
+	var err error
+	for totWritten < len(data) {
+		if len(toWrite) > 1500 {
+			n, err = c.bufWriter.Write(toWrite)
+			c.bufWriter.Flush()
+		} else {
+			n, err = c.conn.Write(toWrite)
+		}
+		totWritten += n
+		if err != nil {
+			if nErr, ok := err.(net.Error); ok && nErr.Temporary() {
+				//temporary error
+			} else {
+				return totWritten, err
+			}
+		}
+		toWrite = toWrite[n:]
+	}
+	return totWritten, nil
 }
 
 //parse for Common Error
