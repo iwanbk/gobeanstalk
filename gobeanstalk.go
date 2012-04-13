@@ -80,15 +80,10 @@ func Dial(addr string) (*Conn, error) {
 
 //Watching tube
 func (c *Conn) Watch(tubename string) (int, error) {
-	err := c.sendCmd("watch %s\r\n", tubename)
-	if err != nil {
-		return -1, err
-	}
+	cmd := fmt.Sprintf("watch %s\r\n", tubename)
 
-	//wait for response
-	resp, err := c.reader.ReadString('\n')
+	resp, err := sendGetResp(c, cmd)
 	if err != nil {
-		log.Println("[watch]waiting response failed:", err.Error())
 		return -1, err
 	}
 
@@ -107,14 +102,9 @@ The "ignore" command is for consumers. It removes the named tube from the
 watch list for the current connection
 */
 func (c *Conn) Ignore(tubename string) (int, error) {
-	//send command
-	err := c.sendCmd("ignore %s\r\n", tubename)
-	if err != nil {
-		return -1, err
-	}
-
-	//read response string
-	resp, err := c.reader.ReadString('\n')
+	//send command and read response string
+	cmd := fmt.Sprintf("ignore %s\r\n", tubename)
+	resp, err := sendGetResp(c, cmd)
 	if err != nil {
 		return -1, err
 	}
@@ -133,20 +123,13 @@ func (c *Conn) Ignore(tubename string) (int, error) {
 
 //Reserve Job
 func (c *Conn) Reserve() (*Job, error) {
-	//send command
-	err := c.sendCmd("reserve\r\n")
+	//send command and read response
+	resp, err := sendGetResp(c, "reserve\r\n")
 	if err != nil {
 		return nil, err
 	}
 
-	//wait for response
-	resp, err := c.reader.ReadString('\n')
-	if err != nil {
-		log.Println("waiting response failed:", err.Error())
-		return nil, err
-	}
-
-	//read response
+	//parse response
 	var id uint64
 	var bodyLen int
 
@@ -206,19 +189,11 @@ func (c *Conn) Use(tubename string) error {
 
 //Put job
 func (c *Conn) Put(data []byte, pri, delay, ttr int) (uint64, error) {
-	header := fmt.Sprintf("put %d %d %d %d\r\n", pri, delay, ttr, len(data))
-	cmd := concatSlice([]byte(header), data)
-	cmd = concatSlice(cmd, []byte("\r\n"))
-	_, err := c.conn.Write(cmd)
-	if err != nil {
-		log.Println("send job cmd failed")
-		return 0, err
-	}
+	cmd := fmt.Sprintf("put %d %d %d %d\r\n", pri, delay, ttr, len(data))
+	cmd = cmd + string(data) + "\r\n"
 
-	//read response
-	resp, err := c.reader.ReadString('\n')
+	resp, err := sendGetResp(c, cmd)
 	if err != nil {
-		log.Println("[put] response failed:", err.Error())
 		return 0, err
 	}
 
@@ -294,13 +269,7 @@ func (c *Conn) Touch(id uint64) error {
 
 //send command and expect some exact response
 func sendExpectExact(c *Conn, cmd, expected string) error {
-	_, err := c.conn.Write([]byte(cmd))
-	if err != nil {
-		return err
-	}
-
-	//wait for response
-	resp, err := c.reader.ReadString('\n')
+	resp, err := sendGetResp(c, cmd)
 	if err != nil {
 		return err
 	}
@@ -311,14 +280,19 @@ func sendExpectExact(c *Conn, cmd, expected string) error {
 	return nil
 }
 
-//Send formatted command to server
-func (c *Conn) sendCmd(format string, args ...interface{}) error {
-	cmd := fmt.Sprintf(format, args...)
+//Send command and read response
+func sendGetResp(c *Conn, cmd string) (string, error) {
 	_, err := c.conn.Write([]byte(cmd))
 	if err != nil {
-		log.Println("can't send to server :", err.Error())
+		return "", err
 	}
-	return err
+
+	//wait for response
+	resp, err := c.reader.ReadString('\n')
+	if err != nil {
+		return "", err
+	}
+	return resp, nil
 }
 
 //read bytes until \n
