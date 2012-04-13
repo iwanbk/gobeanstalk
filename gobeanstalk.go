@@ -6,6 +6,7 @@ import (
 	"bufio"
 	"errors"
 	"fmt"
+	"io"
 	"log"
 	"net"
 	"strings"
@@ -147,16 +148,14 @@ func (c *Conn) Reserve() (*Job, error) {
 	}
 
 	//read job body
-	body, err := c.readBytes()
+	body := make([]byte, bodyLen+2) //+2 is for trailing \r\n
+	n, err := io.ReadFull(c.reader, body)
 	if err != nil {
 		log.Println("failed reading body:", err.Error())
 		return nil, err
 	}
 
-	body = body[:len(body)-2]
-	if len(body) != bodyLen {
-		return nil, errors.New(fmt.Sprintf("invalid body len = %d/%d", len(body), bodyLen))
-	}
+	body = body[:n-2] //strip \r\n trail
 
 	return &Job{id, body}, nil
 }
@@ -293,12 +292,6 @@ func sendGetResp(c *Conn, cmd string) (string, error) {
 	return resp, nil
 }
 
-//read bytes until \n
-func (c *Conn) readBytes() ([]byte, error) {
-	rsp, err := c.reader.ReadBytes('\n')
-	return rsp, err
-}
-
 //parse for Common Error
 func parseCommonError(str string) error {
 	switch str {
@@ -316,12 +309,4 @@ func parseCommonError(str string) error {
 		return errUnknownCommand
 	}
 	return errUnknown
-}
-
-//concat two slices of []byte
-func concatSlice(slc1, slc2 []byte) []byte {
-	newSlc := make([]byte, len(slc1)+len(slc2))
-	copy(newSlc, slc1)
-	copy(newSlc[len(slc1):], slc2)
-	return newSlc
 }
