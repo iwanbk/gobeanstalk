@@ -28,8 +28,8 @@ var (
 
 //gobeanstalk error
 var (
-	errInvalidLen	  = errors.New("Invalid Length")
-	errUnknown        = errors.New("Unknown Error")
+	errInvalidLen = errors.New("Invalid Length")
+	errUnknown    = errors.New("Unknown Error")
 )
 
 //Connection to beanstalkd
@@ -49,16 +49,15 @@ func NewConn(conn net.Conn, addr string) (*Conn, error) {
 	return c, nil
 }
 
-
 //A beanstalkd job
 type Job struct {
-	Id uint64
+	Id   uint64
 	Body []byte
 }
 
 //Create new job
 func NewJob(id uint64, body []byte) *Job {
-	j :=  &Job{id, body}
+	j := &Job{id, body}
 	return j
 }
 
@@ -218,7 +217,6 @@ func (c *Conn) Put(data []byte, pri, delay, ttr int) (uint64, error) {
 	}
 	return 0, errUnknown
 }
-
 
 /*
 Release a job.
