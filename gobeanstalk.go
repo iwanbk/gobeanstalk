@@ -12,6 +12,10 @@ import (
 	"strings"
 )
 
+const (
+	MIN_LEN_TO_BUF = 1500 //minimum data len to send using bufio
+)
+
 //beanstalkd error
 var (
 	errOutOfMemory    = errors.New("Out of Memory")
@@ -35,8 +39,8 @@ var (
 
 //Connection to beanstalkd
 type Conn struct {
-	conn   net.Conn
-	addr   string
+	conn      net.Conn
+	addr      string
 	bufReader *bufio.Reader
 	bufWriter *bufio.Writer
 }
@@ -295,26 +299,31 @@ func sendGetResp(c *Conn, cmd string) (string, error) {
 	return resp, nil
 }
 
+//try to send all of data
+//if data len < 1500, it use TCPConn.Write
+//if data len >= 1500, it use bufio.Write
 func sendFull(c *Conn, data []byte) (int, error) {
 	toWrite := data
 	totWritten := 0
 	var n int
 	var err error
 	for totWritten < len(data) {
-		if len(toWrite) > 1500 {
+		if len(toWrite) >= MIN_LEN_TO_BUF {
 			n, err = c.bufWriter.Write(toWrite)
-			c.bufWriter.Flush()
+			if err != nil && !isNetTempErr(err) {
+				return totWritten, err
+			}
+			err = c.bufWriter.Flush()
+			if err != nil && !isNetTempErr(err) {
+				return totWritten, err
+			}
 		} else {
 			n, err = c.conn.Write(toWrite)
-		}
-		totWritten += n
-		if err != nil {
-			if nErr, ok := err.(net.Error); ok && nErr.Temporary() {
-				//temporary error
-			} else {
+			if err != nil && !isNetTempErr(err) {
 				return totWritten, err
 			}
 		}
+		totWritten += n
 		toWrite = toWrite[n:]
 	}
 	return totWritten, nil
@@ -337,4 +346,12 @@ func parseCommonError(str string) error {
 		return errUnknownCommand
 	}
 	return errUnknown
+}
+
+//Check if it is temporary network error
+func isNetTempErr(err error) bool {
+	if nerr, ok := err.(net.Error); ok && nerr.Temporary() {
+		return true
+	}
+	return false
 }
