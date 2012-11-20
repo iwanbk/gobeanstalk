@@ -1,5 +1,6 @@
 #gobeanstalk
-Go [Beanstalkd](http://kr.github.com/beanstalkd/) client library
+Go [Beanstalkd](http://kr.github.com/beanstalkd/) client library.
+Read the doc [here](http://go.pkgdoc.org/github.com/iwanbk/gobeanstalk) .
 
 ## INSTALL
 	go get github.com/iwanbk/gobeanstalk
