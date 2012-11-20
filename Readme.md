@@ -49,7 +49,7 @@ func main() {
 			log.Println("reserve failed")
 			log.Fatal(err)
 		}
-		fmt.Printf("id:%d, body:%s\n", j.Id, j.Body)
+		fmt.Printf("id:%d, body:%s\n", j.Id, string(j.Body))
 		err = conn.Delete(j.Id)
 		if err != nil {
 			log.Fatal(err)
