@@ -64,6 +64,7 @@ Producer commands:
 
 * use
 * put
+* put-unique (for https://github.com/netsweng/beanstalkd fork of beanstalkd)
 
 Worker commands:
 
