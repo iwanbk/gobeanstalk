@@ -270,6 +270,16 @@ func (c *Conn) Touch(id uint64) error {
 	return sendExpectExact(c, cmd, expected)
 }
 
+/*
+Quit
+
+Close network connection.
+*/
+func (c *Conn) Quit() {
+	sendFull(c, []byte("quit \r\n"))
+	c.conn.Close()
+}
+
 //send command and expect some exact response
 func sendExpectExact(c *Conn, cmd, expected string) error {
 	resp, err := sendGetResp(c, cmd)

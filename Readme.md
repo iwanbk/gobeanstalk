@@ -76,6 +76,10 @@ Worker commands:
 * release
 * bury
 
+Other commands:
+
+* quit
+
 ## Author
 
 * [Iwan Budi Kusnanto](http://ibk.labhijau.net)
