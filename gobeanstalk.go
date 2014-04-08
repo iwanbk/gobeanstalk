@@ -166,6 +166,48 @@ func (c *Conn) Reserve() (*Job, error) {
 	return &Job{id, body}, nil
 }
 
+/*
+Fetch Job Stats
+
+The "stats-job" command is for both producers/consumers and passes through the
+raw YAML returned by beanstalkd for the given job ID.
+*/
+func (c *Conn) StatsJob(id uint64) ([]byte, error) {
+	//send command and read response
+	cmd := fmt.Sprintf("stats-job %d\r\n", id)
+	resp, err := sendGetResp(c, cmd)
+	if err != nil {
+		return nil, err
+	}
+
+	//parse response
+	var bodyLen int
+
+	switch {
+	case strings.Index(resp, "OK") == 0:
+		_, err = fmt.Sscanf(resp, "OK %d\r\n", &bodyLen)
+		if err != nil {
+			return nil, err
+		}
+	case resp == "NOT_FOUND\r\n":
+		return nil, errNotFound
+	default:
+		return nil, parseCommonError(resp)
+	}
+
+	//read job body
+	body := make([]byte, bodyLen+2) //+2 is for trailing \r\n
+	n, err := io.ReadFull(c.bufReader, body)
+	if err != nil {
+		log.Println("failed reading body:", err.Error())
+		return nil, err
+	}
+
+	body = body[:n-2] //strip \r\n trail
+
+	return body, nil
+}
+
 //Delete a job
 func (c *Conn) Delete(id uint64) error {
 	cmd := fmt.Sprintf("delete %d\r\n", id)
@@ -192,7 +234,7 @@ func (c *Conn) Use(tubename string) error {
 }
 
 //Put job
-func (c *Conn) Put(data []byte, pri, delay, ttr int) (uint64, error) {
+func (c *Conn) Put(data []byte, pri uint32, delay, ttr int64) (uint64, error) {
 	cmd := fmt.Sprintf("put %d %d %d %d\r\n", pri, delay, ttr, len(data))
 	cmd = cmd + string(data) + "\r\n"
 
@@ -234,7 +276,7 @@ fails because of a transitory error.
 	delay is an integer number of seconds to wait before putting the job in
 		the ready queue. The job will be in the "delayed" state during this time.
 */
-func (c *Conn) Release(id uint64, pri, delay int) error {
+func (c *Conn) Release(id uint64, pri uint32, delay int64) error {
 	cmd := fmt.Sprintf("release %d %d %d\r\n", id, pri, delay)
 	expected := "RELEASED\r\n"
 	return sendExpectExact(c, cmd, expected)
@@ -249,7 +291,7 @@ kicks them with the "kick" command.
 	id is the job id to release.
 	pri is a new priority to assign to the job.
 */
-func (c *Conn) Bury(id uint64, pri int) error {
+func (c *Conn) Bury(id uint64, pri uint32) error {
 	cmd := fmt.Sprintf("bury %d %d\r\n", id, pri)
 	expected := "BURIED\r\n"
 	return sendExpectExact(c, cmd, expected)
