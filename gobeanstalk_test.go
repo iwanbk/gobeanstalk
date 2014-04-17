@@ -72,6 +72,18 @@ func TestReserve(t *testing.T) {
 	reserve(t, testtube)
 }
 
+func statsJob(t *testing.T, tubename string) {
+	conn, j := reserve(t, testtube)
+	yaml, err := conn.StatsJob(j.Id)
+	if err != nil {
+		t.Fatal("StatsJob failed.Err = ", err.Error())
+	}
+	t.Log(string(yaml))
+}
+func TestStatsJob(t *testing.T) {
+	statsJob(t, testtube)
+}
+
 func TestDelete(t *testing.T) {
 	conn, j := reserve(t, testtube)
 	err := conn.Delete(j.Id)
