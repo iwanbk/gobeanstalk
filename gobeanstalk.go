@@ -208,7 +208,7 @@ func (c *Conn) StatsJob(id uint64) ([]byte, error) {
 	return body, nil
 }
 
-//Delete a job
+//Delete delete a job given it's id
 func (c *Conn) Delete(id uint64) error {
 	cmd := fmt.Sprintf("delete %d\r\n", id)
 	expected := "DELETED\r\n"
@@ -233,7 +233,27 @@ func (c *Conn) Use(tubename string) error {
 	return sendExpectExact(c, cmd, expected)
 }
 
-//Put job
+/*
+Put a job.
+
+It inserts a job into the client's currently used tube.
+
+data is job body.
+
+pri is an integer < 2**32. Jobs with smaller priority values will be
+scheduled before jobs with larger priorities. The most urgent priority is 0;
+the least urgent priority is 4,294,967,295.
+
+delay is an integer number of seconds to wait before putting the job in
+the ready queue. The job will be in the "delayed" state during this time.
+
+ttr -- time to run -- is an integer number of seconds to allow a worker
+to run this job. This time is counted from the moment a worker reserves
+this job. If the worker does not delete, release, or bury the job within
+ttr seconds, the job will time out and the server will release the job.
+The minimum ttr is 1. If the client sends 0, the server will silently
+increase the ttr to 1
+*/
 func (c *Conn) Put(data []byte, pri, delay, ttr int) (uint64, error) {
 	cmd := fmt.Sprintf("put %d %d %d %d\r\n", pri, delay, ttr, len(data))
 	cmd = cmd + string(data) + "\r\n"
