@@ -16,7 +16,7 @@ func dial(t *testing.T) *Conn {
 }
 
 func TestDial(t *testing.T) {
-	if _, err := Dial("localhost:11300") ; err != nil {
+	if _, err := Dial("localhost:11300"); err != nil {
 		t.Fatal("Dial failed.err = :", err.Error())
 	}
 }
