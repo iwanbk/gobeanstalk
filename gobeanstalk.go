@@ -254,7 +254,7 @@ ttr seconds, the job will time out and the server will release the job.
 The minimum ttr is 1. If the client sends 0, the server will silently
 increase the ttr to 1
 */
-func (c *Conn) Put(data []byte, pri, delay, ttr int) (uint64, error) {
+func (c *Conn) Put(data []byte, pri uint32, delay, ttr int64) (uint64, error) {
 	cmd := fmt.Sprintf("put %d %d %d %d\r\n", pri, delay, ttr, len(data))
 	cmd = cmd + string(data) + "\r\n"
 
@@ -296,7 +296,7 @@ fails because of a transitory error.
 	delay is an integer number of seconds to wait before putting the job in
 		the ready queue. The job will be in the "delayed" state during this time.
 */
-func (c *Conn) Release(id uint64, pri, delay int) error {
+func (c *Conn) Release(id uint64, pri uint32, delay int64) error {
 	cmd := fmt.Sprintf("release %d %d %d\r\n", id, pri, delay)
 	expected := "RELEASED\r\n"
 	return sendExpectExact(c, cmd, expected)
@@ -311,7 +311,7 @@ kicks them with the "kick" command.
 	id is the job id to release.
 	pri is a new priority to assign to the job.
 */
-func (c *Conn) Bury(id uint64, pri int) error {
+func (c *Conn) Bury(id uint64, pri uint32) error {
 	cmd := fmt.Sprintf("bury %d %d\r\n", id, pri)
 	expected := "BURIED\r\n"
 	return sendExpectExact(c, cmd, expected)
