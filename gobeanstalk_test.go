@@ -1,6 +1,9 @@
 package gobeanstalk
 
-import "testing"
+import (
+	"testing"
+	"time"
+)
 
 const (
 	testtube = "testtube"
@@ -35,7 +38,7 @@ func put(t *testing.T, tubename string, jobBody string) {
 	if err != nil {
 		t.Fatal("use failed.Err = ", err.Error())
 	}
-	_, err = conn.Put([]byte(jobBody), 0, 0, 0)
+	_, err = conn.Put([]byte(jobBody), 0, 2*time.Second, 30*time.Second)
 	if err != nil {
 		t.Fatal("Put failed. Err = ", err.Error())
 	}
