@@ -59,7 +59,7 @@ func NewConn(conn net.Conn, addr string) (*Conn, error) {
 
 //Job represent beanstalkd job
 type Job struct {
-	Id   uint64
+	ID   uint64
 	Body []byte
 }
 

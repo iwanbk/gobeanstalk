@@ -77,7 +77,7 @@ func TestReserve(t *testing.T) {
 
 func statsJob(t *testing.T, tubename string) {
 	conn, j := reserve(t, testtube)
-	yaml, err := conn.StatsJob(j.Id)
+	yaml, err := conn.StatsJob(j.ID)
 	if err != nil {
 		t.Fatal("StatsJob failed.Err = ", err.Error())
 	}
@@ -89,7 +89,7 @@ func TestStatsJob(t *testing.T) {
 
 func TestDelete(t *testing.T) {
 	conn, j := reserve(t, testtube)
-	err := conn.Delete(j.Id)
+	err := conn.Delete(j.ID)
 	if err != nil {
 		t.Error("delete failed. Err = ", err.Error())
 	}
