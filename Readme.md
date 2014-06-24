@@ -49,8 +49,8 @@ func main() {
 		if err != nil {
 			log.Fatal(err)
 		}
-		log.Printf("id:%d, body:%s\n", j.Id, string(j.Body))
-		err = conn.Delete(j.Id)
+		log.Printf("id:%d, body:%s\n", j.ID, string(j.Body))
+		err = conn.Delete(j.ID)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -79,6 +79,10 @@ Other commands:
 
 * stats-job
 * quit
+
+
+# Release Notes
+Latest release is v0.3 that contains API changes, see release notes [here](https://github.com/iwanbk/gobeanstalk/blob/master/ReleaseNotes.txt)
 
 ## Author
 
