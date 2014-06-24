@@ -1,5 +1,5 @@
-//Go beanstalkd client library
-//Copyright(2012) Iwan Budi Kusnanto. See LICENSE for detail
+//Package gobeanstalk implement beanstalkd client library in Go.
+//Copyright(2012-2014) Iwan Budi Kusnanto. See LICENSE for detail
 package gobeanstalk
 
 import (
@@ -10,34 +10,35 @@ import (
 	"log"
 	"net"
 	"strings"
+	"time"
 )
 
 const (
-	MIN_LEN_TO_BUF = 1500 //minimum data len to send using bufio
+	minLenToBuf = 1500 //minimum data len to send using bufio
 )
 
 //beanstalkd error
 var (
-	errOutOfMemory    = errors.New("Out of Memory")
-	errInternalError  = errors.New("Internal Error")
-	errBadFormat      = errors.New("Bad Format")
-	errUnknownCommand = errors.New("Unknown Command")
-	errBuried         = errors.New("Buried")
-	errExpectedCrlf   = errors.New("Expected CRLF")
-	errJobTooBig      = errors.New("Job Too Big")
-	errDraining       = errors.New("Draining")
-	errDeadlineSoon   = errors.New("Deadline Soon")
-	errTimedOut       = errors.New("Timed Out")
-	errNotFound       = errors.New("Not Found")
+	errOutOfMemory    = errors.New("out of memory")
+	errInternalError  = errors.New("internal error")
+	errBadFormat      = errors.New("bad format")
+	errUnknownCommand = errors.New("unknown command")
+	errBuried         = errors.New("buried")
+	errExpectedCrlf   = errors.New("expected CRLF")
+	errJobTooBig      = errors.New("job too big")
+	errDraining       = errors.New("draining")
+	errDeadlineSoon   = errors.New("deadline soon")
+	errTimedOut       = errors.New("timed out")
+	errNotFound       = errors.New("not found")
 )
 
 //gobeanstalk error
 var (
-	errInvalidLen = errors.New("Invalid Length")
-	errUnknown    = errors.New("Unknown Error")
+	errInvalidLen = errors.New("invalid length")
+	errUnknown    = errors.New("unknown error")
 )
 
-//Connection to beanstalkd
+//Conn represent a connection to beanstalkd server
 type Conn struct {
 	conn      net.Conn
 	addr      string
@@ -45,7 +46,7 @@ type Conn struct {
 	bufWriter *bufio.Writer
 }
 
-//create new connection
+//NewConn create a new connection
 func NewConn(conn net.Conn, addr string) (*Conn, error) {
 	c := new(Conn)
 	c.conn = conn
@@ -56,19 +57,19 @@ func NewConn(conn net.Conn, addr string) (*Conn, error) {
 	return c, nil
 }
 
-//A beanstalkd job
+//Job represent beanstalkd job
 type Job struct {
 	Id   uint64
 	Body []byte
 }
 
-//Create new job
+//NewJob create a new job
 func NewJob(id uint64, body []byte) *Job {
 	j := &Job{id, body}
 	return j
 }
 
-//Connect to beanstalkd server
+//Dial connect to beanstalkd server
 func Dial(addr string) (*Conn, error) {
 	kon, err := net.Dial("tcp", addr)
 	if err != nil {
@@ -84,7 +85,7 @@ func Dial(addr string) (*Conn, error) {
 	return c, nil
 }
 
-//Watching tube
+//Watch a tube
 func (c *Conn) Watch(tubename string) (int, error) {
 	cmd := fmt.Sprintf("watch %s\r\n", tubename)
 
@@ -120,7 +121,7 @@ func (c *Conn) Ignore(tubename string) (int, error) {
 	_, err = fmt.Sscanf(resp, "WATCHING %d\r\n", &tubeCount)
 	if err != nil {
 		if resp == "NOT_IGNORED\r\n" {
-			return -1, errors.New("Not Ignored")
+			return -1, errors.New("not ignored")
 		}
 		return -1, parseCommonError(resp)
 	}
@@ -167,7 +168,7 @@ func (c *Conn) Reserve() (*Job, error) {
 }
 
 /*
-Fetch Job Stats
+StatsJob fetch job stats
 
 The "stats-job" command is for both producers/consumers and passes through the
 raw YAML returned by beanstalkd for the given job ID.
@@ -244,18 +245,18 @@ pri is an integer < 2**32. Jobs with smaller priority values will be
 scheduled before jobs with larger priorities. The most urgent priority is 0;
 the least urgent priority is 4,294,967,295.
 
-delay is an integer number of seconds to wait before putting the job in
+delay is time to wait before putting the job in
 the ready queue. The job will be in the "delayed" state during this time.
 
-ttr -- time to run -- is an integer number of seconds to allow a worker
+ttr -- time to run -- is time to allow a worker
 to run this job. This time is counted from the moment a worker reserves
 this job. If the worker does not delete, release, or bury the job within
-ttr seconds, the job will time out and the server will release the job.
-The minimum ttr is 1. If the client sends 0, the server will silently
-increase the ttr to 1
+ttr time, the job will time out and the server will release the job.
+The minimum ttr is 1 second. If the client sends 0 second, the server will silently
+increase the ttr to 1 second
 */
-func (c *Conn) Put(data []byte, pri uint32, delay, ttr int64) (uint64, error) {
-	cmd := fmt.Sprintf("put %d %d %d %d\r\n", pri, delay, ttr, len(data))
+func (c *Conn) Put(data []byte, pri uint32, delay, ttr time.Duration) (uint64, error) {
+	cmd := fmt.Sprintf("put %d %d %d %d\r\n", pri, uint64(delay.Seconds()), uint64(ttr.Seconds()), len(data))
 	cmd = cmd + string(data) + "\r\n"
 
 	resp, err := sendGetResp(c, cmd)
@@ -282,7 +283,6 @@ func (c *Conn) Put(data []byte, pri uint32, delay, ttr int64) (uint64, error) {
 	default:
 		return 0, parseCommonError(resp)
 	}
-	return 0, errUnknown
 }
 
 /*
@@ -293,11 +293,11 @@ its state as "ready") to be run by any client. It is normally used when the job
 fails because of a transitory error.
 	id is the job id to release.
 	pri is a new priority to assign to the job.
-	delay is an integer number of seconds to wait before putting the job in
+	delay is time to wait before putting the job in
 		the ready queue. The job will be in the "delayed" state during this time.
 */
-func (c *Conn) Release(id uint64, pri uint32, delay int64) error {
-	cmd := fmt.Sprintf("release %d %d %d\r\n", id, pri, delay)
+func (c *Conn) Release(id uint64, pri uint32, delay time.Duration) error {
+	cmd := fmt.Sprintf("release %d %d %d\r\n", id, pri, uint64(delay.Seconds()))
 	expected := "RELEASED\r\n"
 	return sendExpectExact(c, cmd, expected)
 }
@@ -333,9 +333,7 @@ func (c *Conn) Touch(id uint64) error {
 }
 
 /*
-Quit
-
-Close network connection.
+Quit close network connection.
 */
 func (c *Conn) Quit() {
 	sendFull(c, []byte("quit \r\n"))
@@ -380,7 +378,7 @@ func sendFull(c *Conn, data []byte) (int, error) {
 	var n int
 	var err error
 	for totWritten < len(data) {
-		if len(toWrite) >= MIN_LEN_TO_BUF {
+		if len(toWrite) >= minLenToBuf {
 			n, err = c.bufWriter.Write(toWrite)
 			if err != nil && !isNetTempErr(err) {
 				return totWritten, err

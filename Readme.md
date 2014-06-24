@@ -1,6 +1,6 @@
 #gobeanstalk
-Go [Beanstalkd](http://kr.github.com/beanstalkd/) client library.
-Read the doc [here](http://go.pkgdoc.org/github.com/iwanbk/gobeanstalk) .
+Go [Beanstalkd](http://kr.github.io/beanstalkd/) client library.
+Read the doc [here](http://godoc.org/github.com/iwanbk/gobeanstalk) .
 
 ## INSTALL
 	go get github.com/iwanbk/gobeanstalk
@@ -11,51 +11,50 @@ Read the doc [here](http://go.pkgdoc.org/github.com/iwanbk/gobeanstalk) .
 ### Producer
 ```go
 import (
-	"fmt"
 	"github.com/iwanbk/gobeanstalk"
 	"log"
+	"time"
 )
 
 func main() {
-    conn, err := gobeanstalk.Dial("localhost:11300")
-	if err != nil {
-		log.Fatal(err)
-	}
-	id, err := conn.Put([]byte("hello"), 0, 0, 10)
+	conn, err := gobeanstalk.Dial("localhost:11300")
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	fmt.Printf("Job id %d inserted\n", id)
+	id, err := conn.Put([]byte("hello"), 0, 10*time.Second, 30*time.Second)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	log.Printf("Job id %d inserted\n", id)
 }
+
 ```
 
 ### Consumer
 ```go
 import (
 	"github.com/iwanbk/gobeanstalk"
-	"fmt"
 	"log"
 )
 
 func main() {
 	conn, err := gobeanstalk.Dial("localhost:11300")
 	if err != nil {
-		log.Printf("connect failed")
 		log.Fatal(err)
 	}
-    for {
-        j, err := conn.Reserve()
+	for {
+		j, err := conn.Reserve()
 		if err != nil {
-			log.Println("reserve failed")
 			log.Fatal(err)
 		}
-		fmt.Printf("id:%d, body:%s\n", j.Id, string(j.Body))
+		log.Printf("id:%d, body:%s\n", j.Id, string(j.Body))
 		err = conn.Delete(j.Id)
 		if err != nil {
 			log.Fatal(err)
 		}
-    }
+	}
 }
 ```
 
@@ -78,8 +77,9 @@ Worker commands:
 
 Other commands:
 
+* stats-job
 * quit
 
 ## Author
 
-* [Iwan Budi Kusnanto](http://ibk.labhijau.net)
+* [Iwan Budi Kusnanto](http://iwan.my.id)
