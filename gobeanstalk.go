@@ -283,7 +283,6 @@ func (c *Conn) Put(data []byte, pri uint32, delay, ttr time.Duration) (uint64, e
 	default:
 		return 0, parseCommonError(resp)
 	}
-	return 0, errUnknown
 }
 
 /*
