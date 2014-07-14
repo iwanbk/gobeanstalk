@@ -71,6 +71,7 @@ Worker commands:
 * watch
 * ignore
 * reserve
+* reserve-with-timeout
 * delete
 * touch
 * release
