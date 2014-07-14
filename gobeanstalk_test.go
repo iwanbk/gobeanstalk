@@ -1,6 +1,9 @@
 package gobeanstalk
 
-import "testing"
+import (
+	"testing"
+	"time"
+)
 
 const (
 	testtube = "testtube"
@@ -16,7 +19,7 @@ func dial(t *testing.T) *Conn {
 }
 
 func TestDial(t *testing.T) {
-	if _, err := Dial("localhost:11300") ; err != nil {
+	if _, err := Dial("localhost:11300"); err != nil {
 		t.Fatal("Dial failed.err = :", err.Error())
 	}
 }
@@ -35,7 +38,7 @@ func put(t *testing.T, tubename string, jobBody string) {
 	if err != nil {
 		t.Fatal("use failed.Err = ", err.Error())
 	}
-	_, err = conn.Put([]byte(jobBody), 0, 0, 0)
+	_, err = conn.Put([]byte(jobBody), 0, 2*time.Second, 30*time.Second)
 	if err != nil {
 		t.Fatal("Put failed. Err = ", err.Error())
 	}
@@ -72,9 +75,21 @@ func TestReserve(t *testing.T) {
 	reserve(t, testtube)
 }
 
+func statsJob(t *testing.T, tubename string) {
+	conn, j := reserve(t, testtube)
+	yaml, err := conn.StatsJob(j.ID)
+	if err != nil {
+		t.Fatal("StatsJob failed.Err = ", err.Error())
+	}
+	t.Log(string(yaml))
+}
+func TestStatsJob(t *testing.T) {
+	statsJob(t, testtube)
+}
+
 func TestDelete(t *testing.T) {
 	conn, j := reserve(t, testtube)
-	err := conn.Delete(j.Id)
+	err := conn.Delete(j.ID)
 	if err != nil {
 		t.Error("delete failed. Err = ", err.Error())
 	}

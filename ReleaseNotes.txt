@@ -1,0 +1,5 @@
+v0.3 - 2014-6-24
+This release contains API changes:
+- Job.Id renamed to Job.ID as suggested by golint
+- priority type changed to uint32. It changes Put,Bury,and Release function signature.
+- delay and ttr type changed time.Duration. It changes Put and Release function signature.
