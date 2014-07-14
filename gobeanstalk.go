@@ -167,6 +167,46 @@ func (c *Conn) Reserve() (*Job, error) {
 	return &Job{id, body}, nil
 }
 
+//Reserve Job with timeout
+func (c *Conn) ReserveWithTimeout(t int) (*Job, error) {
+	//send command and read response
+	cmd := fmt.Sprintf("reserve-with-timeout %d\r\n", t)
+	resp, err := sendGetResp(c, cmd)
+	if err != nil {
+		return nil, err
+	}
+
+	//parse response
+	var id uint64
+	var bodyLen int
+
+	switch {
+	case strings.Index(resp, "RESERVED") == 0:
+		_, err = fmt.Sscanf(resp, "RESERVED %d %d\r\n", &id, &bodyLen)
+		if err != nil {
+			return nil, err
+		}
+	case resp == "DEADLINE_SOON\r\n":
+		return nil, errDeadlineSoon
+	case resp == "TIMED_OUT\r\n":
+		return nil, errTimedOut
+	default:
+		return nil, parseCommonError(resp)
+	}
+
+	//read job body
+	body := make([]byte, bodyLen+2) //+2 is for trailing \r\n
+	n, err := io.ReadFull(c.bufReader, body)
+	if err != nil {
+		log.Println("failed reading body:", err.Error())
+		return nil, err
+	}
+
+	body = body[:n-2] //strip \r\n trail
+
+	return &Job{id, body}, nil
+}
+
 /*
 StatsJob fetch job stats
 
