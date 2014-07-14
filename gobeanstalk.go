@@ -223,6 +223,38 @@ func (c *Conn) Put(data []byte, pri, delay, ttr int) (uint64, error) {
 	return 0, errUnknown
 }
 
+//Put unique job
+func (c *Conn) PutUnique(data []byte, pri, delay, ttr int) (uint64, error) {
+	cmd := fmt.Sprintf("put-unique %d %d %d %d\r\n", pri, delay, ttr, len(data))
+	cmd = cmd + string(data) + "\r\n"
+
+	resp, err := sendGetResp(c, cmd)
+	if err != nil {
+		return 0, err
+	}
+
+	//parse Put response
+	switch {
+	case strings.Index(resp, "INSERTED") == 0:
+		var id uint64
+		_, parseErr := fmt.Sscanf(resp, "INSERTED %d\r\n", &id)
+		return id, parseErr
+	case strings.Index(resp, "BURIED") == 0:
+		var id uint64
+		fmt.Sscanf(resp, "BURIED %d\r\n", &id)
+		return id, errBuried
+	case resp == "EXPECTED_CRLF\r\n":
+		return 0, errExpectedCrlf
+	case resp == "JOB_TOO_BIG\r\n":
+		return 0, errJobTooBig
+	case resp == "DRAINING\r\n":
+		return 0, errDraining
+	default:
+		return 0, parseCommonError(resp)
+	}
+	return 0, errUnknown
+}
+
 /*
 Release a job.
 
