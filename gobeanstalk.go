@@ -209,6 +209,88 @@ func (c *Conn) StatsJob(id uint64) ([]byte, error) {
 	return body, nil
 }
 
+/*
+Stats fetch server stats
+
+The "stats" command is for both producers/consumers and passes through the
+raw YAML returned by beanstalkd.
+*/
+func (c *Conn) Stats() ([]byte, error) {
+	//send command and read response
+	cmd := fmt.Sprintf("stats\r\n", id)
+	resp, err := sendGetResp(c, cmd)
+	if err != nil {
+		return nil, err
+	}
+
+	//parse response
+	var bodyLen int
+
+	switch {
+	case strings.Index(resp, "OK") == 0:
+		_, err = fmt.Sscanf(resp, "OK %d\r\n", &bodyLen)
+		if err != nil {
+			return nil, err
+		}
+	default:
+		return nil, parseCommonError(resp)
+	}
+
+	//read job body
+	body := make([]byte, bodyLen+2) //+2 is for trailing \r\n
+	n, err := io.ReadFull(c.bufReader, body)
+	if err != nil {
+		log.Println("failed reading body:", err.Error())
+		return nil, err
+	}
+
+	body = body[:n-2] //strip \r\n trail
+
+	return body, nil
+}
+
+/*
+StatsTube fetch tube stats
+
+The "stats-tube" command is for both producers/consumers and passes through the
+raw YAML returned by beanstalkd for the given tube ID.
+*/
+func (c *Conn) StatsTube(id uint64) ([]byte, error) {
+	//send command and read response
+	cmd := fmt.Sprintf("stats-tube %d\r\n", id)
+	resp, err := sendGetResp(c, cmd)
+	if err != nil {
+		return nil, err
+	}
+
+	//parse response
+	var bodyLen int
+
+	switch {
+	case strings.Index(resp, "OK") == 0:
+		_, err = fmt.Sscanf(resp, "OK %d\r\n", &bodyLen)
+		if err != nil {
+			return nil, err
+		}
+	case resp == "NOT_FOUND\r\n":
+		return nil, errNotFound
+	default:
+		return nil, parseCommonError(resp)
+	}
+
+	//read job body
+	body := make([]byte, bodyLen+2) //+2 is for trailing \r\n
+	n, err := io.ReadFull(c.bufReader, body)
+	if err != nil {
+		log.Println("failed reading body:", err.Error())
+		return nil, err
+	}
+
+	body = body[:n-2] //strip \r\n trail
+
+	return body, nil
+}
+
 //Delete delete a job given it's id
 func (c *Conn) Delete(id uint64) error {
 	cmd := fmt.Sprintf("delete %d\r\n", id)
