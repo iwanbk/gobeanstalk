@@ -94,3 +94,29 @@ func TestDelete(t *testing.T) {
 		t.Error("delete failed. Err = ", err.Error())
 	}
 }
+
+func stats(t *testing.T) {
+	conn := dial(t)
+	yaml, err := conn.Stats()
+	if err != nil {
+		t.Fatal("Stats failed. Err = ", err.Error())
+	}
+	t.Log(string(yaml))
+}
+
+func TestStats(t *testing.T) {
+	stats(t)
+}
+
+func statsTube(t *testing.T, tubename string) {
+	conn := watch(t, tubename)
+	yaml, err := conn.StatsTube(tubename)
+	if err != nil {
+		t.Fatal("StatsTube failed. Err = ", err.Error())
+	}
+	t.Log(string(yaml))
+}
+
+func TestStatsTube(t *testing.T) {
+	statsTube(t, testtube)
+}
