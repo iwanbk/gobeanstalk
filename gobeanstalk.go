@@ -217,7 +217,7 @@ raw YAML returned by beanstalkd.
 */
 func (c *Conn) Stats() ([]byte, error) {
 	//send command and read response
-	cmd := fmt.Sprintf("stats\r\n", id)
+	cmd := "stats\r\n"
 	resp, err := sendGetResp(c, cmd)
 	if err != nil {
 		return nil, err
@@ -255,9 +255,9 @@ StatsTube fetch tube stats
 The "stats-tube" command is for both producers/consumers and passes through the
 raw YAML returned by beanstalkd for the given tube ID.
 */
-func (c *Conn) StatsTube(id uint64) ([]byte, error) {
+func (c *Conn) StatsTube(id string) ([]byte, error) {
 	//send command and read response
-	cmd := fmt.Sprintf("stats-tube %d\r\n", id)
+	cmd := fmt.Sprintf("stats-tube %s\r\n", id)
 	resp, err := sendGetResp(c, cmd)
 	if err != nil {
 		return nil, err
