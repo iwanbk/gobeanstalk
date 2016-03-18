@@ -28,7 +28,7 @@ var (
 	errJobTooBig      = errors.New("job too big")
 	errDraining       = errors.New("draining")
 	errDeadlineSoon   = errors.New("deadline soon")
-	errTimedOut       = errors.New("timed out")
+	ErrTimedOut       = errors.New("timed out")
 	errNotFound       = errors.New("not found")
 )
 
@@ -128,10 +128,16 @@ func (c *Conn) Ignore(tubename string) (int, error) {
 	return tubeCount, nil
 }
 
-//Reserve Job
-func (c *Conn) Reserve() (*Job, error) {
+//Reserve Job, with an optional timeout
+func (c *Conn) Reserve(timeout ...time.Duration) (*Job, error) {
+    // handle the optional timeout
+    cmd := "reserve\r\n"
+    if len(timeout) > 0 {
+        cmd = fmt.Sprintf("reserve-with-timeout %d\r\n", int(timeout[0].Seconds()))
+    }
+    
 	//send command and read response
-	resp, err := sendGetResp(c, "reserve\r\n")
+	resp, err := sendGetResp(c, cmd)
 	if err != nil {
 		return nil, err
 	}
@@ -149,7 +155,7 @@ func (c *Conn) Reserve() (*Job, error) {
 	case resp == "DEADLINE_SOON\r\n":
 		return nil, errDeadlineSoon
 	case resp == "TIMED_OUT\r\n":
-		return nil, errTimedOut
+		return nil, ErrTimedOut
 	default:
 		return nil, parseCommonError(resp)
 	}

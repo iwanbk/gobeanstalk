@@ -60,9 +60,19 @@ func TestWatch(t *testing.T) {
 	watch(t, testtube)
 }
 
-func reserve(t *testing.T, tubename string) (*Conn, *Job) {
+func reserve(t *testing.T, tubename string, timeout ...time.Duration) (*Conn, *Job) {
 	conn := watch(t, tubename)
-	j, err := conn.Reserve()
+    var j *Job
+    var err error
+    if len(timeout) > 0 {
+        j, err = conn.Reserve(timeout[0])
+    } else {
+        j, err = conn.Reserve()
+    }
+    
+    if err == ErrTimedOut {
+        return nil, nil
+    }
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -72,7 +82,9 @@ func reserve(t *testing.T, tubename string) (*Conn, *Job) {
 	return conn, j
 }
 func TestReserve(t *testing.T) {
-	reserve(t, testtube)
+	conn, j := reserve(t, testtube)
+    reserve(t, testtube, 2*time.Second)
+    conn.Release(j.ID, 0, 0*time.Second)
 }
 
 func statsJob(t *testing.T, tubename string) {
@@ -82,6 +94,7 @@ func statsJob(t *testing.T, tubename string) {
 		t.Fatal("StatsJob failed.Err = ", err.Error())
 	}
 	t.Log(string(yaml))
+    conn.Release(j.ID, 0, 0*time.Second)
 }
 func TestStatsJob(t *testing.T) {
 	statsJob(t, testtube)
