@@ -38,7 +38,7 @@ func put(t *testing.T, tubename string, jobBody string) {
 	if err != nil {
 		t.Fatal("use failed.Err = ", err.Error())
 	}
-	_, err = conn.Put([]byte(jobBody), 0, 2*time.Second, 30*time.Second)
+	_, err = conn.Put([]byte(jobBody), 0, 0*time.Second, 30*time.Second)
 	if err != nil {
 		t.Fatal("Put failed. Err = ", err.Error())
 	}
@@ -71,7 +71,7 @@ func reserve(t *testing.T, tubename string, timeout ...time.Duration) (*Conn, *J
     }
     
     if err == ErrTimedOut {
-        return nil, nil
+        return conn, nil
     }
 	if err != nil {
 		t.Fatal(err)
@@ -83,7 +83,10 @@ func reserve(t *testing.T, tubename string, timeout ...time.Duration) (*Conn, *J
 }
 func TestReserve(t *testing.T) {
 	conn, j := reserve(t, testtube)
-    reserve(t, testtube, 2*time.Second)
+    _, j2 := reserve(t, testtube, 2*time.Second) // this should make the test take ~2 seconds, but not 30!
+    if j2 != nil {
+        t.Error("reserving with timeout when there is nothing to reserve did not return nothing")
+    }
     conn.Release(j.ID, 0, 0*time.Second)
 }
 
@@ -106,4 +109,46 @@ func TestDelete(t *testing.T) {
 	if err != nil {
 		t.Error("delete failed. Err = ", err.Error())
 	}
+}
+
+func TestBury(t *testing.T) {
+    put(t, testtube, testjob)
+    conn, j := reserve(t, testtube)
+    err := conn.Bury(j.ID, 0)
+    if err != nil {
+        t.Error("bury failed. Err = ", err.Error())
+    }
+    conn, j = reserve(t, testtube, 0*time.Second)
+    if j != nil {
+        t.Error("bury did not make the job unreservable")
+    }
+}
+
+func TestKick(t *testing.T) {
+    conn := watch(t, testtube)
+    conn.Use(testtube)
+    num, err := conn.Kick(5)
+    if err != nil {
+        t.Error("kick failed. Err = ", err.Error())
+    }
+    if num != 1 {
+        t.Error("kick did not return the expected number of jobs kicked")
+    }
+    conn, j := reserve(t, testtube, 0*time.Second)
+    if j == nil {
+        t.Fatal("kick did not make the job reservable")
+    }
+    
+    // since we know the job ID here, we'll test KickJob as well
+    jobID := j.ID
+    conn.Bury(jobID, 0)
+    err = conn.KickJob(jobID)
+    if err != nil {
+        t.Error("kick-job failed. Err = ", err.Error())
+    }
+    conn, j = reserve(t, testtube, 0*time.Second)
+    if j == nil {
+        t.Fatal("kick-job did not make the job reservable")
+    }
+    conn.Delete(jobID)
 }

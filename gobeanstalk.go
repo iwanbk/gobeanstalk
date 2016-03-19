@@ -314,13 +314,51 @@ Bury a job.
 The bury command puts a job into the "buried" state. Buried jobs are put into a
 FIFO linked list and will not be touched by the server again until a client
 kicks them with the "kick" command.
-	id is the job id to release.
+	id is the job id to bury.
 	pri is a new priority to assign to the job.
 */
 func (c *Conn) Bury(id uint64, pri uint32) error {
 	cmd := fmt.Sprintf("bury %d %d\r\n", id, pri)
 	expected := "BURIED\r\n"
 	return sendExpectExact(c, cmd, expected)
+}
+
+/*
+Kick jobs.
+
+The kick command applies only to the currently used tube. It moves jobs into
+the ready queue. If there are any buried jobs, it will only kick buried jobs.
+Otherwise it will kick delayed jobs.
+    bound is an integer upper bound on the number of jobs to kick
+*/
+func (c *Conn) Kick(bound uint64) (uint64, error) {
+    cmd := fmt.Sprintf("kick %d\r\n", bound)
+    
+    resp, err := sendGetResp(c, cmd)
+    if err != nil {
+        return 0, err
+    }
+    
+    if (strings.Index(resp, "KICKED") == 0) {
+        var id uint64
+        fmt.Sscanf(resp, "KICKED %d\r\n", &id)
+        return id, nil
+    } else {
+        return 0, errUnknown
+    }
+}
+
+/*
+Kick a specific job.
+
+If the given job id exists and is in a buried or delayed state, it will be moved
+to the ready queue of the the same tube where it currently belongs.
+    id is the job id to kick.
+*/
+func (c *Conn) KickJob(id uint64) error {
+    cmd := fmt.Sprintf("kick-job %d\r\n", id)
+    expected := "KICKED\r\n"
+    return sendExpectExact(c, cmd, expected)
 }
 
 /*
