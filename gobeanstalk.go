@@ -173,6 +173,42 @@ func (c *Conn) Reserve(timeout ...time.Duration) (*Job, error) {
 	return &Job{id, body}, nil
 }
 
+// yamlExtract does the main work for the various methods that return YAML
+func (c *Conn) yamlExtract(cmd string) ([]byte, error) {
+    //send command and read response
+    resp, err := sendGetResp(c, cmd)
+    if err != nil {
+        return nil, err
+    }
+
+    //parse response
+    var bodyLen int
+
+    switch {
+    case strings.Index(resp, "OK") == 0:
+        _, err = fmt.Sscanf(resp, "OK %d\r\n", &bodyLen)
+        if err != nil {
+            return nil, err
+        }
+    case resp == "NOT_FOUND\r\n":
+        return nil, errNotFound
+    default:
+        return nil, parseCommonError(resp)
+    }
+
+    //read job body
+    body := make([]byte, bodyLen+2) //+2 is for trailing \r\n
+    n, err := io.ReadFull(c.bufReader, body)
+    if err != nil {
+        log.Println("failed reading body:", err.Error())
+        return nil, err
+    }
+
+    body = body[:n-2] //strip \r\n trail
+
+    return body, nil
+}
+
 /*
 StatsJob fetch job stats
 
@@ -180,39 +216,32 @@ The "stats-job" command is for both producers/consumers and passes through the
 raw YAML returned by beanstalkd for the given job ID.
 */
 func (c *Conn) StatsJob(id uint64) ([]byte, error) {
-	//send command and read response
-	cmd := fmt.Sprintf("stats-job %d\r\n", id)
-	resp, err := sendGetResp(c, cmd)
-	if err != nil {
-		return nil, err
-	}
+    return c.yamlExtract(fmt.Sprintf("stats-job %d\r\n", id))
+}
 
-	//parse response
-	var bodyLen int
+/*
+StatsTube fetch tubs stats
 
-	switch {
-	case strings.Index(resp, "OK") == 0:
-		_, err = fmt.Sscanf(resp, "OK %d\r\n", &bodyLen)
-		if err != nil {
-			return nil, err
-		}
-	case resp == "NOT_FOUND\r\n":
-		return nil, errNotFound
-	default:
-		return nil, parseCommonError(resp)
-	}
+The "stats-tube" command is for both producers/consumers and passes through the
+raw YAML returned by beanstalkd for the given tube name.
+*/
+func (c *Conn) StatsTube(tubename string) ([]byte, error) {
+    return c.yamlExtract(fmt.Sprintf("stats-tube %s\r\n", tubename))
+}
 
-	//read job body
-	body := make([]byte, bodyLen+2) //+2 is for trailing \r\n
-	n, err := io.ReadFull(c.bufReader, body)
-	if err != nil {
-		log.Println("failed reading body:", err.Error())
-		return nil, err
-	}
+/*
+Stats fetch system stats
 
-	body = body[:n-2] //strip \r\n trail
+The "stats" command is for both producers/consumers and passes through the
+raw YAML returned by beanstalkd.
+*/
+func (c *Conn) Stats() ([]byte, error) {
+    return c.yamlExtract("stats\r\n")
+}
 
-	return body, nil
+//ListTubes returns all existing tube names the raw YAML returned by beanstalkd.
+func (c *Conn) ListTubes() ([]byte, error) {
+    return c.yamlExtract("list-tubes\r\n")
 }
 
 //Delete delete a job given it's id

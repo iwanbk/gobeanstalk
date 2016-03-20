@@ -90,17 +90,48 @@ func TestReserve(t *testing.T) {
     conn.Release(j.ID, 0, 0*time.Second)
 }
 
-func statsJob(t *testing.T, tubename string) {
-	conn, j := reserve(t, testtube)
-	yaml, err := conn.StatsJob(j.ID)
-	if err != nil {
-		t.Fatal("StatsJob failed.Err = ", err.Error())
-	}
-	t.Log(string(yaml))
-    conn.Release(j.ID, 0, 0*time.Second)
-}
 func TestStatsJob(t *testing.T) {
-	statsJob(t, testtube)
+	conn, j := reserve(t, testtube)
+    yaml, err := conn.StatsJob(j.ID)
+    if err != nil {
+        t.Fatal("StatsJob failed. Err = ", err.Error())
+    }
+    t.Log(string(yaml))
+    conn.Release(j.ID, 0, 0*time.Second)
+    
+    // test that it works without reserving first, now that we have a valid
+    // job id
+    yaml, err = conn.StatsJob(j.ID)
+    if err != nil {
+        t.Fatal("StatsJob failed without reserving first. Err = ", err.Error())
+    }
+}
+
+func TestStatsTube(t *testing.T) {
+    conn := dial(t)
+    yaml, err := conn.StatsTube(testtube)
+    if err != nil {
+        t.Fatal("StatsTube failed. Err = ", err.Error())
+    }
+    t.Log(string(yaml))
+}
+
+func TestStats(t *testing.T) {
+    conn := dial(t)
+    yaml, err := conn.Stats()
+    if err != nil {
+        t.Fatal("Stats failed. Err = ", err.Error())
+    }
+    t.Log(string(yaml))
+}
+
+func TestListTubes(t *testing.T) {
+    conn := dial(t)
+    yaml, err := conn.ListTubes()
+    if err != nil {
+        t.Fatal("ListTubes failed. Err = ", err.Error())
+    }
+    t.Log(string(yaml))
 }
 
 func TestDelete(t *testing.T) {
