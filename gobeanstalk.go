@@ -130,12 +130,12 @@ func (c *Conn) Ignore(tubename string) (int, error) {
 
 //Reserve Job, with an optional timeout
 func (c *Conn) Reserve(timeout ...time.Duration) (*Job, error) {
-    // handle the optional timeout
-    cmd := "reserve\r\n"
-    if len(timeout) > 0 {
-        cmd = fmt.Sprintf("reserve-with-timeout %d\r\n", int(timeout[0].Seconds()))
-    }
-    
+	// handle the optional timeout
+	cmd := "reserve\r\n"
+	if len(timeout) > 0 {
+		cmd = fmt.Sprintf("reserve-with-timeout %d\r\n", int(timeout[0].Seconds()))
+	}
+
 	//send command and read response
 	resp, err := sendGetResp(c, cmd)
 	if err != nil {
@@ -175,38 +175,38 @@ func (c *Conn) Reserve(timeout ...time.Duration) (*Job, error) {
 
 // yamlExtract does the main work for the various methods that return YAML
 func (c *Conn) yamlExtract(cmd string) ([]byte, error) {
-    //send command and read response
-    resp, err := sendGetResp(c, cmd)
-    if err != nil {
-        return nil, err
-    }
+	//send command and read response
+	resp, err := sendGetResp(c, cmd)
+	if err != nil {
+		return nil, err
+	}
 
-    //parse response
-    var bodyLen int
+	//parse response
+	var bodyLen int
 
-    switch {
-    case strings.Index(resp, "OK") == 0:
-        _, err = fmt.Sscanf(resp, "OK %d\r\n", &bodyLen)
-        if err != nil {
-            return nil, err
-        }
-    case resp == "NOT_FOUND\r\n":
-        return nil, errNotFound
-    default:
-        return nil, parseCommonError(resp)
-    }
+	switch {
+	case strings.Index(resp, "OK") == 0:
+		_, err = fmt.Sscanf(resp, "OK %d\r\n", &bodyLen)
+		if err != nil {
+			return nil, err
+		}
+	case resp == "NOT_FOUND\r\n":
+		return nil, errNotFound
+	default:
+		return nil, parseCommonError(resp)
+	}
 
-    //read job body
-    body := make([]byte, bodyLen+2) //+2 is for trailing \r\n
-    n, err := io.ReadFull(c.bufReader, body)
-    if err != nil {
-        log.Println("failed reading body:", err.Error())
-        return nil, err
-    }
+	//read job body
+	body := make([]byte, bodyLen+2) //+2 is for trailing \r\n
+	n, err := io.ReadFull(c.bufReader, body)
+	if err != nil {
+		log.Println("failed reading body:", err.Error())
+		return nil, err
+	}
 
-    body = body[:n-2] //strip \r\n trail
+	body = body[:n-2] //strip \r\n trail
 
-    return body, nil
+	return body, nil
 }
 
 /*
@@ -216,7 +216,7 @@ The "stats-job" command is for both producers/consumers and passes through the
 raw YAML returned by beanstalkd for the given job ID.
 */
 func (c *Conn) StatsJob(id uint64) ([]byte, error) {
-    return c.yamlExtract(fmt.Sprintf("stats-job %d\r\n", id))
+	return c.yamlExtract(fmt.Sprintf("stats-job %d\r\n", id))
 }
 
 /*
@@ -226,7 +226,7 @@ The "stats-tube" command is for both producers/consumers and passes through the
 raw YAML returned by beanstalkd for the given tube name.
 */
 func (c *Conn) StatsTube(tubename string) ([]byte, error) {
-    return c.yamlExtract(fmt.Sprintf("stats-tube %s\r\n", tubename))
+	return c.yamlExtract(fmt.Sprintf("stats-tube %s\r\n", tubename))
 }
 
 /*
@@ -236,12 +236,12 @@ The "stats" command is for both producers/consumers and passes through the
 raw YAML returned by beanstalkd.
 */
 func (c *Conn) Stats() ([]byte, error) {
-    return c.yamlExtract("stats\r\n")
+	return c.yamlExtract("stats\r\n")
 }
 
 //ListTubes returns all existing tube names the raw YAML returned by beanstalkd.
 func (c *Conn) ListTubes() ([]byte, error) {
-    return c.yamlExtract("list-tubes\r\n")
+	return c.yamlExtract("list-tubes\r\n")
 }
 
 //Delete delete a job given it's id
@@ -361,20 +361,20 @@ Otherwise it will kick delayed jobs.
     bound is an integer upper bound on the number of jobs to kick
 */
 func (c *Conn) Kick(bound uint64) (uint64, error) {
-    cmd := fmt.Sprintf("kick %d\r\n", bound)
-    
-    resp, err := sendGetResp(c, cmd)
-    if err != nil {
-        return 0, err
-    }
-    
-    if (strings.Index(resp, "KICKED") == 0) {
-        var id uint64
-        fmt.Sscanf(resp, "KICKED %d\r\n", &id)
-        return id, nil
-    } else {
-        return 0, errUnknown
-    }
+	cmd := fmt.Sprintf("kick %d\r\n", bound)
+
+	resp, err := sendGetResp(c, cmd)
+	if err != nil {
+		return 0, err
+	}
+
+	if strings.Index(resp, "KICKED") == 0 {
+		var id uint64
+		fmt.Sscanf(resp, "KICKED %d\r\n", &id)
+		return id, nil
+	} else {
+		return 0, errUnknown
+	}
 }
 
 /*
@@ -385,9 +385,9 @@ to the ready queue of the the same tube where it currently belongs.
     id is the job id to kick.
 */
 func (c *Conn) KickJob(id uint64) error {
-    cmd := fmt.Sprintf("kick-job %d\r\n", id)
-    expected := "KICKED\r\n"
-    return sendExpectExact(c, cmd, expected)
+	cmd := fmt.Sprintf("kick-job %d\r\n", id)
+	expected := "KICKED\r\n"
+	return sendExpectExact(c, cmd, expected)
 }
 
 /*
