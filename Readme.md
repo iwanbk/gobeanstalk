@@ -1,6 +1,6 @@
-#gobeanstalk
+#gobeanstalk [![Build Status](https://travis-ci.org/iwanbk/gobeanstalk.svg?branch=master)](https://travis-ci.org/iwanbk/gobeanstalk) [![GoDoc](https://godoc.org/github.com/iwanbk/gobeanstalk?status.svg)](https://godoc.org/github.com/iwanbk/gobeanstalk) 
+
 Go [Beanstalkd](http://kr.github.io/beanstalkd/) client library.
-Read the doc [here](http://godoc.org/github.com/iwanbk/gobeanstalk) .
 
 ## INSTALL
 	go get github.com/iwanbk/gobeanstalk
