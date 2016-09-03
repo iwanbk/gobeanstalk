@@ -1,0 +1,19 @@
+language: go
+
+install:
+  - go get -t
+    
+  # Install most recent beanstalkd from source
+  - wget https://github.com/kr/beanstalkd/archive/v1.10.tar.gz
+  - tar xf v1.10.tar.gz
+  - make -C beanstalkd-1.10/
+  - mv beanstalkd-1.10/beanstalkd .
+
+go:
+  - 1.6
+
+before_script:
+  - ./beanstalkd&
+
+script:
+  - go test -v ./...
