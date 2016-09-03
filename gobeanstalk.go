@@ -1,5 +1,4 @@
-//Package gobeanstalk implement beanstalkd client library in Go.
-//Copyright(2012-2014) Iwan Budi Kusnanto. See LICENSE for detail
+// gobeanstalk implement beanstalkd client library in Go.
 package gobeanstalk
 
 import (

@@ -1,6 +1,7 @@
 package gobeanstalk
 
 import (
+	"bytes"
 	"testing"
 	"time"
 )
@@ -26,6 +27,8 @@ func TestDial(t *testing.T) {
 
 func TestUse(t *testing.T) {
 	conn := dial(t)
+	defer conn.Quit()
+
 	err := conn.Use(testtube)
 	if err != nil {
 		t.Fatal("use failed.Err = ", err.Error())
@@ -34,6 +37,8 @@ func TestUse(t *testing.T) {
 
 func put(t *testing.T, tubename string, jobBody string) {
 	conn := dial(t)
+	defer conn.Quit()
+
 	err := conn.Use(tubename)
 	if err != nil {
 		t.Fatal("use failed.Err = ", err.Error())
@@ -46,6 +51,14 @@ func put(t *testing.T, tubename string, jobBody string) {
 
 func TestPut(t *testing.T) {
 	put(t, testtube, testjob)
+}
+
+func TestPutBigJob(t *testing.T) {
+	var buf bytes.Buffer
+	for i := 0; i < 500; i++ {
+		buf.WriteString("1234567890")
+	}
+	put(t, "TestPutBigJob", buf.String())
 }
 
 func watch(t *testing.T, tubename string) *Conn {
@@ -77,7 +90,7 @@ func reserve(t *testing.T, tubename string, timeout ...time.Duration) (*Conn, *J
 		t.Fatal(err)
 	}
 	if string(j.Body) != testjob {
-		t.Fatal("job body check failed")
+		t.Fatalf("job body check failed. content = %v", string(j.Body))
 	}
 	return conn, j
 }
