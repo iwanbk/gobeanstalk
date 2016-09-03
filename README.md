@@ -60,13 +60,8 @@ func main() {
 
 ## Implemented Commands
 
-Producer commands:
-
 * use
 * put
-
-Worker commands:
-
 * watch
 * ignore
 * reserve
@@ -74,9 +69,9 @@ Worker commands:
 * touch
 * release
 * bury
-
-Other commands:
-
+* kick
+* kick-job
+* list-tubes
 * stats
 * stats-tube
 * stats-job
