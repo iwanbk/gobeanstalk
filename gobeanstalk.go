@@ -1,4 +1,4 @@
-// gobeanstalk implement beanstalkd client library in Go.
+// Package gobeanstalk implement beanstalkd client library in Go.
 package gobeanstalk
 
 import (
@@ -17,23 +17,23 @@ const (
 
 // beanstalkd error
 var (
-	errOutOfMemory    = errors.New("out of memory")
-	errInternalError  = errors.New("internal error")
-	errBadFormat      = errors.New("bad format")
-	errUnknownCommand = errors.New("unknown command")
-	errBuried         = errors.New("buried")
-	errExpectedCrlf   = errors.New("expected CRLF")
-	errJobTooBig      = errors.New("job too big")
-	errDraining       = errors.New("draining")
-	errDeadlineSoon   = errors.New("deadline soon")
+	ErrOutOfMemory    = errors.New("out of memory")
+	ErrInternalError  = errors.New("internal error")
+	ErrBadFormat      = errors.New("bad format")
+	ErrUnknownCommand = errors.New("unknown command")
+	ErrBuried         = errors.New("buried")
+	ErrExpectedCrlf   = errors.New("expected CRLF")
+	ErrJobTooBig      = errors.New("job too big")
+	ErrDraining       = errors.New("draining")
+	ErrDeadlineSoon   = errors.New("deadline soon")
 	ErrTimedOut       = errors.New("timed out")
-	errNotFound       = errors.New("not found")
+	ErrNotFound       = errors.New("not found")
 )
 
 // gobeanstalk error
 var (
-	errInvalidLen = errors.New("invalid length")
-	errUnknown    = errors.New("unknown error")
+	ErrInvalidLen = errors.New("invalid length")
+	ErrUnknown    = errors.New("unknown error")
 )
 
 // Conn represent a connection to beanstalkd server
@@ -237,7 +237,7 @@ will be put into the tube named "default".
 func (c *Conn) Use(tubename string) error {
 	//check parameter
 	if len(tubename) > 200 {
-		return errInvalidLen
+		return ErrInvalidLen
 	}
 
 	cmd := fmt.Sprintf("use %s\r\n", tubename)
@@ -284,7 +284,7 @@ func (c *Conn) Put(data []byte, pri uint32, delay, ttr time.Duration) (uint64, e
 	case strings.HasPrefix(resp, "BURIED"):
 		var id uint64
 		fmt.Sscanf(resp, "BURIED %d\r\n", &id)
-		return id, errBuried
+		return id, ErrBuried
 	default:
 		return 0, parseError(resp)
 	}
@@ -455,19 +455,19 @@ func sendFull(c *Conn, data []byte) (int, error) {
 
 var errorTable = map[string]error{
 
-	"DEADLINE_SOON\r\n": errDeadlineSoon,
+	"DEADLINE_SOON\r\n": ErrDeadlineSoon,
 	"TIMED_OUT\r\n":     ErrTimedOut,
-	"EXPECTED_CRLF\r\n": errExpectedCrlf,
-	"JOB_TOO_BIG\r\n":   errJobTooBig,
-	"DRAINING\r\n":      errDraining,
-	"BURIED\r\n":        errBuried,
-	"NOT_FOUND\r\n":     errNotFound,
+	"EXPECTED_CRLF\r\n": ErrExpectedCrlf,
+	"JOB_TOO_BIG\r\n":   ErrJobTooBig,
+	"DRAINING\r\n":      ErrDraining,
+	"BURIED\r\n":        ErrBuried,
+	"NOT_FOUND\r\n":     ErrNotFound,
 
 	// common error
-	"OUT_OF_MEMORY\r\n":   errOutOfMemory,
-	"INTERNAL_ERROR\r\n":  errInternalError,
-	"BAD_FORMAT\r\n":      errBadFormat,
-	"UNKNOWN_COMMAND\r\n": errUnknownCommand,
+	"OUT_OF_MEMORY\r\n":   ErrOutOfMemory,
+	"INTERNAL_ERROR\r\n":  ErrInternalError,
+	"BAD_FORMAT\r\n":      ErrBadFormat,
+	"UNKNOWN_COMMAND\r\n": ErrUnknownCommand,
 }
 
 // parse for Common Error
@@ -475,7 +475,7 @@ func parseError(str string) error {
 	if v, ok := errorTable[str]; ok {
 		return v
 	}
-	return fmt.Errorf("unkown error: %v", str)
+	return fmt.Errorf("unknown error: %v", str)
 }
 
 //Check if it is temporary network error

@@ -196,3 +196,15 @@ func TestKick(t *testing.T) {
 	}
 	conn.Delete(jobID)
 }
+
+func TestParseError(t *testing.T) {
+	err := parseError("OUT_OF_MEMORY\r\n")
+	if err != ErrOutOfMemory {
+		t.Fatalf("expected ErrOutOfMemory got :%v", err)
+	}
+
+	err = parseError("test error")
+	if err.Error() != "unknown error: test error" {
+		t.Fatalf("expected `unknown error: test error` got `%v`", err)
+	}
+}
