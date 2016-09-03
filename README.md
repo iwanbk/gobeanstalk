@@ -1,4 +1,4 @@
-#gobeanstalk [![Build Status](https://travis-ci.org/iwanbk/gobeanstalk.svg?branch=master)](https://travis-ci.org/iwanbk/gobeanstalk) [![GoDoc](https://godoc.org/github.com/iwanbk/gobeanstalk?status.svg)](https://godoc.org/github.com/iwanbk/gobeanstalk) 
+#gobeanstalk [![Build Status](https://travis-ci.org/iwanbk/gobeanstalk.svg?branch=master)](https://travis-ci.org/iwanbk/gobeanstalk) [![GoDoc](https://godoc.org/github.com/iwanbk/gobeanstalk?status.svg)](https://godoc.org/github.com/iwanbk/gobeanstalk) [![Coverage Status](https://coveralls.io/repos/github/iwanbk/gobeanstalk/badge.svg?branch=coverall)](https://coveralls.io/github/iwanbk/gobeanstalk?branch=master) 
 
 Go [Beanstalkd](http://kr.github.io/beanstalkd/) client library.
 
