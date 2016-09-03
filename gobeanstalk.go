@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
 	"net"
 	"strings"
 	"time"
@@ -17,7 +16,7 @@ const (
 	minLenToBuf = 1500 //minimum data len to send using bufio
 )
 
-//beanstalkd error
+// beanstalkd error
 var (
 	errOutOfMemory    = errors.New("out of memory")
 	errInternalError  = errors.New("internal error")
@@ -32,13 +31,13 @@ var (
 	errNotFound       = errors.New("not found")
 )
 
-//gobeanstalk error
+// gobeanstalk error
 var (
 	errInvalidLen = errors.New("invalid length")
 	errUnknown    = errors.New("unknown error")
 )
 
-//Conn represent a connection to beanstalkd server
+// Conn represent a connection to beanstalkd server
 type Conn struct {
 	conn      net.Conn
 	addr      string
@@ -46,7 +45,7 @@ type Conn struct {
 	bufWriter *bufio.Writer
 }
 
-//NewConn create a new connection
+// NewConn create a new connection
 func NewConn(conn net.Conn, addr string) (*Conn, error) {
 	c := new(Conn)
 	c.conn = conn
@@ -57,19 +56,21 @@ func NewConn(conn net.Conn, addr string) (*Conn, error) {
 	return c, nil
 }
 
-//Job represent beanstalkd job
+// Job represent beanstalkd job
 type Job struct {
 	ID   uint64
 	Body []byte
 }
 
-//NewJob create a new job
+// NewJob create a new job
 func NewJob(id uint64, body []byte) *Job {
-	j := &Job{id, body}
-	return j
+	return &Job{
+		ID:   id,
+		Body: body,
+	}
 }
 
-//Dial connect to beanstalkd server
+// Dial connect to beanstalkd server
 func Dial(addr string) (*Conn, error) {
 	kon, err := net.Dial("tcp", addr)
 	if err != nil {
@@ -85,7 +86,7 @@ func Dial(addr string) (*Conn, error) {
 	return c, nil
 }
 
-//Watch a tube
+// Watch a tube
 func (c *Conn) Watch(tubename string) (int, error) {
 	cmd := fmt.Sprintf("watch %s\r\n", tubename)
 
@@ -97,7 +98,7 @@ func (c *Conn) Watch(tubename string) (int, error) {
 	var tubeCount int
 	_, err = fmt.Sscanf(resp, "WATCHING %d\r\n", &tubeCount)
 	if err != nil {
-		return -1, parseCommonError(resp)
+		return -1, parseError(resp)
 	}
 	return tubeCount, nil
 }
@@ -123,7 +124,7 @@ func (c *Conn) Ignore(tubename string) (int, error) {
 		if resp == "NOT_IGNORED\r\n" {
 			return -1, errors.New("not ignored")
 		}
-		return -1, parseCommonError(resp)
+		return -1, parseError(resp)
 	}
 	return tubeCount, nil
 }
@@ -147,30 +148,18 @@ func (c *Conn) Reserve(timeout ...time.Duration) (*Job, error) {
 	var bodyLen int
 
 	switch {
-	case strings.Index(resp, "RESERVED") == 0:
+	case strings.HasPrefix(resp, "RESERVED"):
 		_, err = fmt.Sscanf(resp, "RESERVED %d %d\r\n", &id, &bodyLen)
 		if err != nil {
 			return nil, err
 		}
-	case resp == "DEADLINE_SOON\r\n":
-		return nil, errDeadlineSoon
-	case resp == "TIMED_OUT\r\n":
-		return nil, ErrTimedOut
 	default:
-		return nil, parseCommonError(resp)
+		return nil, parseError(resp)
 	}
 
 	//read job body
-	body := make([]byte, bodyLen+2) //+2 is for trailing \r\n
-	n, err := io.ReadFull(c.bufReader, body)
-	if err != nil {
-		log.Println("failed reading body:", err.Error())
-		return nil, err
-	}
-
-	body = body[:n-2] //strip \r\n trail
-
-	return &Job{id, body}, nil
+	body, err := c.readBody(bodyLen)
+	return &Job{ID: id, Body: body}, err
 }
 
 // yamlExtract does the main work for the various methods that return YAML
@@ -185,28 +174,16 @@ func (c *Conn) yamlExtract(cmd string) ([]byte, error) {
 	var bodyLen int
 
 	switch {
-	case strings.Index(resp, "OK") == 0:
+	case strings.HasPrefix(resp, "OK"):
 		_, err = fmt.Sscanf(resp, "OK %d\r\n", &bodyLen)
 		if err != nil {
 			return nil, err
 		}
-	case resp == "NOT_FOUND\r\n":
-		return nil, errNotFound
 	default:
-		return nil, parseCommonError(resp)
+		return nil, parseError(resp)
 	}
 
-	//read job body
-	body := make([]byte, bodyLen+2) //+2 is for trailing \r\n
-	n, err := io.ReadFull(c.bufReader, body)
-	if err != nil {
-		log.Println("failed reading body:", err.Error())
-		return nil, err
-	}
-
-	body = body[:n-2] //strip \r\n trail
-
-	return body, nil
+	return c.readBody(bodyLen)
 }
 
 /*
@@ -301,22 +278,16 @@ func (c *Conn) Put(data []byte, pri uint32, delay, ttr time.Duration) (uint64, e
 
 	//parse Put response
 	switch {
-	case strings.Index(resp, "INSERTED") == 0:
+	case strings.HasPrefix(resp, "INSERTED"):
 		var id uint64
 		_, parseErr := fmt.Sscanf(resp, "INSERTED %d\r\n", &id)
 		return id, parseErr
-	case strings.Index(resp, "BURIED") == 0:
+	case strings.HasPrefix(resp, "BURIED"):
 		var id uint64
 		fmt.Sscanf(resp, "BURIED %d\r\n", &id)
 		return id, errBuried
-	case resp == "EXPECTED_CRLF\r\n":
-		return 0, errExpectedCrlf
-	case resp == "JOB_TOO_BIG\r\n":
-		return 0, errJobTooBig
-	case resp == "DRAINING\r\n":
-		return 0, errDraining
 	default:
-		return 0, parseCommonError(resp)
+		return 0, parseError(resp)
 	}
 }
 
@@ -358,7 +329,9 @@ Kick jobs.
 The kick command applies only to the currently used tube. It moves jobs into
 the ready queue. If there are any buried jobs, it will only kick buried jobs.
 Otherwise it will kick delayed jobs.
-    bound is an integer upper bound on the number of jobs to kick
+    bound is an integer upper bound on the number of jobs to kick.
+
+It returns an integer indicating the number of jobs actually kicked
 */
 func (c *Conn) Kick(bound uint64) (uint64, error) {
 	cmd := fmt.Sprintf("kick %d\r\n", bound)
@@ -368,17 +341,16 @@ func (c *Conn) Kick(bound uint64) (uint64, error) {
 		return 0, err
 	}
 
-	if strings.Index(resp, "KICKED") == 0 {
+	if strings.HasPrefix(resp, "KICKED") {
 		var id uint64
 		fmt.Sscanf(resp, "KICKED %d\r\n", &id)
 		return id, nil
-	} else {
-		return 0, errUnknown
 	}
+	return 0, parseError(resp)
 }
 
 /*
-Kick a specific job.
+KickJob kickcs a specific job.
 
 If the given job id exists and is in a buried or delayed state, it will be moved
 to the ready queue of the the same tube where it currently belongs.
@@ -413,7 +385,17 @@ func (c *Conn) Quit() {
 	c.conn.Close()
 }
 
-//send command and expect some exact response
+func (c *Conn) readBody(bodyLen int) ([]byte, error) {
+	body := make([]byte, bodyLen+2) //+2 is for trailing \r\n
+	n, err := io.ReadFull(c.bufReader, body)
+	if err != nil {
+		return nil, err
+	}
+
+	return body[:n-2], nil //strip \r\n trail
+}
+
+// send command and expect some exact response
 func sendExpectExact(c *Conn, cmd, expected string) error {
 	resp, err := sendGetResp(c, cmd)
 	if err != nil {
@@ -421,12 +403,12 @@ func sendExpectExact(c *Conn, cmd, expected string) error {
 	}
 
 	if resp != expected {
-		return parseCommonError(resp)
+		return parseError(resp)
 	}
 	return nil
 }
 
-//Send command and read response
+// Send command and read response
 func sendGetResp(c *Conn, cmd string) (string, error) {
 	//_, err := c.conn.Write([]byte(cmd))
 	_, err := sendFull(c, []byte(cmd))
@@ -472,23 +454,29 @@ func sendFull(c *Conn, data []byte) (int, error) {
 	return totWritten, nil
 }
 
-//parse for Common Error
-func parseCommonError(str string) error {
-	switch str {
-	case "BURIED\r\n":
-		return errBuried
-	case "NOT_FOUND\r\n":
-		return errNotFound
-	case "OUT_OF_MEMORY\r\n":
-		return errOutOfMemory
-	case "INTERNAL_ERROR\r\n":
-		return errInternalError
-	case "BAD_FORMAT\r\n":
-		return errBadFormat
-	case "UNKNOWN_COMMAND\r\n":
-		return errUnknownCommand
+var errorTable = map[string]error{
+
+	"DEADLINE_SOON\r\n": errDeadlineSoon,
+	"TIMED_OUT\r\n":     ErrTimedOut,
+	"EXPECTED_CRLF\r\n": errExpectedCrlf,
+	"JOB_TOO_BIG\r\n":   errJobTooBig,
+	"DRAINING\r\n":      errDraining,
+	"BURIED\r\n":        errBuried,
+	"NOT_FOUND\r\n":     errNotFound,
+
+	// common error
+	"OUT_OF_MEMORY\r\n":   errOutOfMemory,
+	"INTERNAL_ERROR\r\n":  errInternalError,
+	"BAD_FORMAT\r\n":      errBadFormat,
+	"UNKNOWN_COMMAND\r\n": errUnknownCommand,
+}
+
+// parse for Common Error
+func parseError(str string) error {
+	if v, ok := errorTable[str]; ok {
+		return v
 	}
-	return errUnknown
+	return fmt.Errorf("unkown error: %v", str)
 }
 
 //Check if it is temporary network error
